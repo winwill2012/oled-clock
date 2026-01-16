@@ -1,11 +1,14 @@
 #include <Arduino.h>
+#include "ButtonDetector.h"
 #include "OledDisplay.h"
+#include "StateManager.h"
 #include "WiFiManager.h"
 
 OledDisplay display(OLED_IIC_DATA_PIN, OLED_IIC_SCL_PIN);
 
 void setup() {
     Serial.begin(115200);
+    ButtonDetector::begin();
     WiFiManager wm;
     wm.autoConnect("ESP32时钟");
     while (!WiFi.isConnected()) {
@@ -14,7 +17,7 @@ void setup() {
     }
     Serial.println("");
     Serial.println("Connected to WiFi");
-    // StateManager::updateState(DisplayClock);
+    StateManager::updateState(DisplayClock);
     display.begin();
 }
 
