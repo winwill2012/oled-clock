@@ -6,18 +6,39 @@ OneButton ButtonDetector::centerButton = OneButton(BUTTON_CENTER_PIN, true, true
 OneButton ButtonDetector::rightButton = OneButton(BUTTON_RIGHT_PIN, true, true);
 
 void left_button_click() {
-    Serial.println("左边按钮单击");
-    StateManager::updateState(DisplayClock);
+    switch (StateManager::getState()) {
+        case DisplayCalendar:
+            StateManager::decreaseCalendarMonth();
+            break;
+        case DisplayMainMenu:
+            StateManager::decreaseMenuIndex();
+            break;
+        default:
+            break;
+    }
 }
 
 void center_button_click() {
-    Serial.println("中间按钮单击");
-    StateManager::updateState(DisplayMainMenu);
+    switch (StateManager::getState()) {
+        case DisplayMainMenu:
+            StateManager::updateStateByMenuItemIndex();
+            break;
+        default:
+            break;
+    }
 }
 
 void right_button_click() {
-    Serial.println("右边按钮单击");
-    StateManager::updateState(DisplayCountdown);
+    switch (StateManager::getState()) {
+        case DisplayCalendar:
+            StateManager::increaseCalendarMonth();
+            break;
+        case DisplayMainMenu:
+            StateManager::increaseMenuIndex();
+            break;
+        default:
+            break;
+    }
 }
 
 void left_button_long_press() {
@@ -26,7 +47,7 @@ void left_button_long_press() {
 
 void center_button_long_press() {
     Serial.println("中间按钮长按");
-    StateManager::updateState(DisplayCalender);
+    StateManager::updateState(DisplayMainMenu);
 }
 
 void right_button_long_press() {
@@ -38,7 +59,19 @@ void left_button_double_click() {
 }
 
 void center_button_double_click() {
-    Serial.println("中间按钮双击");
+    switch (StateManager::getState()) {
+        case DisplayCalendar: {
+            tm timeInfo;
+            StateManager::getTimeClient().update(); // update函数内部做了更新间隔检测，并不会每一次都从网络获取时间
+            unsigned long localEpochTime = StateManager::getTimeClient().getEpochTime();
+            gmtime_r(reinterpret_cast<time_t *>(&localEpochTime), &timeInfo);
+            StateManager::setCalendarYear(timeInfo.tm_year + 1900);
+            StateManager::setCalendarMonth(timeInfo.tm_mon + 1);
+            break;
+        }
+        default:
+            break;
+    }
 }
 
 void right_button_double_click() {
