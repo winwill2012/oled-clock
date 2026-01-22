@@ -244,10 +244,12 @@ void OledDisplay::displayWeather() {
         u8g2.drawButtonUTF8(93, 32,
                             U8G2_BTN_HCENTER | U8G2_BTN_INV | U8G2_BTN_BW1 | U8G2_BTN_SHADOW1, 0, 1, 2,
                             StateManager::getWeatherCityName());
-        u8g2.drawUTF8(66, 56, "10℃~21℃");
+        u8g2.drawUTF8(66, 56, "18℃");
+        u8g2.drawUTF8(90, 56, "|");
+        u8g2.drawUTF8(97, 56, "24%");
         u8g2.drawVLine(58, 16, u8g2.getDisplayHeight() - 16);
         u8g2.setFont(u8g2_font_open_iconic_weather_6x_t);
-        u8g2.drawGlyph(5, 64, 0x0041);
+        u8g2.drawGlyph(5, 64, 0x0045);
     } while (u8g2.nextPage());
 }
 
