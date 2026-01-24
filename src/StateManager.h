@@ -4,6 +4,7 @@
 #include <WiFiUdp.h>
 
 #include "NTPClient.h"
+#include "WeatherQuery.h"
 
 #define EVENT_STATE_CHANGED (1<<0)
 
@@ -18,7 +19,13 @@ enum GlobalState {
 
 class StateManager {
 public:
+    static void startWeatherQuery();
+
     static void updateState(GlobalState state);
+
+    static void updateWeather(const WeatherInfo &info);
+
+    static WeatherInfo getWeatherInfo();
 
     static void updateStateByMenuItemIndex();
 
@@ -60,6 +67,7 @@ private:
     static uint8_t calendarMonth;
     static uint16_t weatherCityId;
     static const char *weatherCityName;
+    static WeatherInfo weatherInfo;
 };
 
 

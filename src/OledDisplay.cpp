@@ -2,6 +2,7 @@
 #include "StateManager.h"
 #include "bitmap.h"
 #include "CommonUtils.h"
+#include "WeatherQuery.h"
 
 tm timeInfo{};
 String clockWeekDays[7] = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
@@ -238,13 +239,16 @@ void OledDisplay::displayCalendar() {
  */
 void OledDisplay::displayWeather() {
     u8g2.firstPage();
+    auto weatherInfo = StateManager::getWeatherInfo();
+    char temp[15];
+    snprintf(temp, sizeof(temp), "%s℃", weatherInfo.temperature);
     do {
         drawWiFiAndBattery("当前天气");
         u8g2.setFont(u8g2_font_wqy12_t_gb2312);
         u8g2.drawButtonUTF8(93, 32,
                             U8G2_BTN_HCENTER | U8G2_BTN_INV | U8G2_BTN_BW1 | U8G2_BTN_SHADOW1, 0, 1, 2,
-                            StateManager::getWeatherCityName());
-        u8g2.drawUTF8(66, 56, "18℃");
+                            weatherInfo.cityName);
+        u8g2.drawUTF8(66, 56, temp);
         u8g2.drawUTF8(90, 56, "|");
         u8g2.drawUTF8(97, 56, "24%");
         u8g2.drawVLine(58, 16, u8g2.getDisplayHeight() - 16);

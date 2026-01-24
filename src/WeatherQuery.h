@@ -1,26 +1,34 @@
 #ifndef OLED_CLOCK_WEATHERQUERY_H
 #define OLED_CLOCK_WEATHERQUERY_H
+#include <HTTPClient.h>
 
 struct WeatherInfo {
-    const char *temp; // 当前温度
-    const char *humidity; // 当前湿度
+    const char *cityName; // 城市
+    const char *temperature; // 当前温度
+    const char *weatherCode; // 天气情况代码
     const char *weather; // 天气情况
+    WeatherInfo(const char *cityName, const char *temperature, const char *weatherCode, const char *weather) {
+        this->cityName = cityName;
+        this->temperature = temperature;
+        this->weatherCode = weatherCode;
+        this->weather = weather;
+    }
 };
 
 class WeatherQuery {
 public:
-    WeatherQuery();
+    WeatherQuery(const char *apiKey);
 
-    void setApiHost(const char *apiHost);
+    void setLocation(const char *location);
 
-    void setLocation(const char *id, const char *locationName);
+    const char *getLocation() const;
 
     WeatherInfo getRealtimeWeatherInfo();
 
 private:
-    const char *apiHost;
-    const char *locationId = nullptr;
-    const char *locationName = nullptr;
+    HTTPClient httpClient;
+    const char *apiKey;
+    const char *locationName = "昆明";
 };
 
 

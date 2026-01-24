@@ -1,5 +1,7 @@
 #include "StateManager.h"
 
+#include "WeatherQuery.h"
+
 int StateManager::menuItemIndex = 1;
 WiFiUDP StateManager::wifiUdp;
 NTPClient StateManager::timeClient = NTPClient(wifiUdp, "time1.aliyun.com", 28800);
@@ -8,6 +10,9 @@ uint16_t StateManager::calendarYear;
 uint8_t StateManager::calendarMonth;
 uint16_t StateManager::weatherCityId = 100;
 const char *StateManager::weatherCityName = "昆明";
+WeatherInfo StateManager::weatherInfo = {"", "", "", ""};
+
+extern WeatherQuery weatherQuery;
 
 EventGroupHandle_t StateManager::eventGroup = xEventGroupCreate();
 
@@ -48,9 +53,25 @@ const char *StateManager::getWeatherCityName() {
 }
 
 
+void StateManager::startWeatherQuery() {
+    const auto timer = xTimerCreate("weather-query-timer", pdMS_TO_TICKS(60000), pdTRUE, nullptr, [](void *ptr) {
+        const auto result = weatherQuery.getRealtimeWeatherInfo();
+        updateWeather(result);
+    });
+    xTimerStart(timer, 0);
+}
+
 void StateManager::updateState(GlobalState newState) {
     state = newState;
     xEventGroupSetBits(eventGroup, EVENT_STATE_CHANGED); // 状态发生变化时，通知OLED显示任务
+}
+
+void StateManager::updateWeather(const WeatherInfo &info) {
+    weatherInfo = info;
+}
+
+WeatherInfo StateManager::getWeatherInfo() {
+    return weatherInfo;
 }
 
 void StateManager::updateStateByMenuItemIndex() {
