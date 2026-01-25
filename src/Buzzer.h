@@ -3,8 +3,16 @@
 
 #define BUZZER_PIN 23
 
-void setup_buzzer();
+class Buzzer {
+public:
+    void begin();
 
-void buzzer_beep();
+    void beep();
+
+    void reset();
+
+private :
+    bool isRinging = false;
+};
 
 #endif //OLED_LEARNING_BUZZER_H

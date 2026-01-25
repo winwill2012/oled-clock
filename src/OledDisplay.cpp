@@ -1,6 +1,7 @@
 #include "OledDisplay.h"
 #include "StateManager.h"
 #include "bitmap.h"
+#include "Buzzer.h"
 #include "CommonUtils.h"
 #include "NTPClient.h"
 #include "WeatherQuery.h"
@@ -10,6 +11,7 @@ String calendarWeekDays[7] = {"日", "一", "二", "三", "四", "五", "六"};
 String menuItemNames[6] = {"计时", "时钟", "日历", "天气", "计时", "时钟"};
 extern NTPClient timeClient;
 extern tm timeInfo;
+extern Buzzer buzzer;
 
 OledDisplay::OledDisplay(const uint8_t sda, const uint8_t scl) : u8g2(U8G2_R0, scl, sda) {
 }
@@ -140,32 +142,6 @@ void OledDisplay::displayConnectWifiTips() {
     } while (u8g2.nextPage());
 }
 
-void OledDisplay::drawPageIndicator(int item) {
-    int pageIndicatorY = 63;
-    switch (item) {
-        case 1:
-            u8g2.drawPixel(60, pageIndicatorY);
-            u8g2.drawPixel(61, pageIndicatorY);
-            u8g2.drawPixel(64, pageIndicatorY);
-            u8g2.drawPixel(67, pageIndicatorY);
-            break;
-        case 2:
-            u8g2.drawPixel(60, pageIndicatorY);
-            u8g2.drawPixel(63, pageIndicatorY);
-            u8g2.drawPixel(64, pageIndicatorY);
-            u8g2.drawPixel(67, pageIndicatorY);
-            break;
-        case 3:
-            u8g2.drawPixel(60, pageIndicatorY);
-            u8g2.drawPixel(63, pageIndicatorY);
-            u8g2.drawPixel(66, pageIndicatorY);
-            u8g2.drawPixel(67, pageIndicatorY);
-            break;
-        default:
-            break;
-    }
-}
-
 void OledDisplay::displayClock() {
     // 获取当前时间
     timeClient.update();
@@ -180,9 +156,6 @@ void OledDisplay::displayClock() {
                  timeInfo.tm_mday / 10, timeInfo.tm_mday % 10,
                  clockWeekDays[timeInfo.tm_wday].c_str());
         drawWiFiAndBattery(date);
-        u8g2.setFont(u8g2_font_wqy12_t_gb2312);
-        u8g2.drawUTF8((u8g2.getDisplayWidth() - u8g2.getUTF8Width(date)) / 2,
-                      u8g2.getAscent() + 2, date);
         u8g2.drawBitmap(4, 20, 3, 32, getBitmapByDigit(timeInfo.tm_hour / 10));
         u8g2.drawBitmap(28, 20, 3, 32, getBitmapByDigit(timeInfo.tm_hour % 10));
         u8g2.drawBitmap(52, 20, 1, 32, IMAGE_DOT);
@@ -200,20 +173,17 @@ void OledDisplay::drawCountdownIndicator(const uint8_t numberIndex) {
     uint8_t centerX = 0;
     // 计算每一位数字的指示箭头的横坐标
     switch (numberIndex) {
-        case 1:
+        case 0:
             centerX = 24;
             break;
-        case 2:
+        case 1:
             centerX = 48;
             break;
-        case 3:
+        case 2:
             centerX = 80;
             break;
-        case 4:
-            centerX = 104;
-            break;
         default:
-            centerX = -10; // 无效值
+            centerX = 104;
             break;
     }
     u8g2.drawPixel(centerX, line1Y);
@@ -228,21 +198,27 @@ void OledDisplay::drawCountdownIndicator(const uint8_t numberIndex) {
 }
 
 void OledDisplay::displayCountdownSet() {
+    auto countdownInfo = StateManager::getCountdownInfo();
     u8g2.firstPage();
     do {
         drawWiFiAndBattery("倒计时设置");
-        u8g2.drawBitmap(12, 20, 3, 32, getBitmapByDigit(StateManager::getCountdownTime() / 1000));
-        u8g2.drawBitmap(36, 20, 3, 32, getBitmapByDigit(StateManager::getCountdownTime() / 100 % 10));
+        u8g2.drawBitmap(12, 20, 3, 32, getBitmapByDigit(countdownInfo.number1));
+        u8g2.drawBitmap(36, 20, 3, 32, getBitmapByDigit(countdownInfo.number2));
         u8g2.drawBitmap(60, 20, 1, 32, IMAGE_DOT);
-        u8g2.drawBitmap(68, 20, 3, 32, getBitmapByDigit(StateManager::getCountdownTime() / 10 % 10));
-        u8g2.drawBitmap(92, 20, 3, 32, getBitmapByDigit(StateManager::getCountdownTime() % 10));
-        drawCountdownIndicator(StateManager::getCountdownIndicator());
+        u8g2.drawBitmap(68, 20, 3, 32, getBitmapByDigit(countdownInfo.number3));
+        u8g2.drawBitmap(92, 20, 3, 32, getBitmapByDigit(countdownInfo.number4));
+        drawCountdownIndicator(countdownInfo.countdownIndicator);
     } while (u8g2.nextPage());
 }
 
 void OledDisplay::displayCountdown() {
-    const int time = StateManager::getCountdownTimeInSeconds() - static_cast<int>(
-                         (millis() - StateManager::getCountdownStartMillis()) / 1000);
+    int time = StateManager::getCountdownInfo().countdownTimeInSeconds - static_cast<int>(
+                   (millis() - StateManager::getCountdownInfo().countdownStartMillis) / 1000);
+    // 倒计时结束，时间不再变小
+    if (time <= 0) {
+        time = 0;
+        buzzer.beep();
+    }
     u8g2.firstPage();
     do {
         drawWiFiAndBattery("倒计时");
@@ -250,7 +226,7 @@ void OledDisplay::displayCountdown() {
         u8g2.drawBitmap(36, 20, 3, 32, getBitmapByDigit(time / 60 % 10));
         u8g2.drawBitmap(60, 20, 1, 32, IMAGE_DOT);
         u8g2.drawBitmap(68, 20, 3, 32, getBitmapByDigit(time % 60 / 10));
-        u8g2.drawBitmap(92, 20, 3, 32, getBitmapByDigit(time % 60));
+        u8g2.drawBitmap(92, 20, 3, 32, getBitmapByDigit(time % 60 % 10));
     } while (u8g2.nextPage());
 }
 
@@ -260,7 +236,7 @@ void OledDisplay::displayCalendar() {
     u8g2.setFontPosTop();
     do {
         u8g2.setFont(u8g2_font_wqy12_t_gb2312);
-        int x = 2, y = 2, width = 15, height = 10;
+        constexpr int x = 2, y = 2, width = 15, height = 10;
         int d = 1;
         char date[3];
         u8g2.drawFrame(0, 0, x + width * 7, 64);

@@ -46,7 +46,6 @@ WeatherInfo WeatherQuery::getRealtimeWeatherInfo() {
 }
 
 // 通过天气代码获取天气描述（和官方有略微改动，最多保留两个字）
-// 官网代码：https://www.doubao.com/chat/36419258016813826
 const char *WeatherQuery::getChineseDescription(const char *code) {
     const int codeInt = strtol(code, nullptr, 10);
     switch (codeInt) {

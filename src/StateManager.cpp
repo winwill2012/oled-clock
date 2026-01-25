@@ -1,11 +1,10 @@
 #include "StateManager.h"
+
+#include "Buzzer.h"
 #include "WeatherQuery.h"
 
-int StateManager::menuItemIndex = 1;
-int StateManager::countdownIndicator = 1;
-int StateManager::countdownTime = 500;
-int StateManager::countdownTimeInSeconds = 300;
-unsigned long StateManager::countdownStartMillis;
+int StateManager::menuIndex = 1;
+CountdownInfo StateManager::countdownInfo;
 GlobalState StateManager::state = DisplayClock;
 uint16_t StateManager::calendarYear;
 uint8_t StateManager::calendarMonth;
@@ -13,22 +12,19 @@ const char *StateManager::weatherCityName = "昆明";
 WeatherInfo StateManager::weatherInfo = {weatherCityName, "0", "1", "晴"};
 
 extern WeatherQuery weatherQuery;
+extern Buzzer buzzer;
 
 EventGroupHandle_t StateManager::eventGroup = xEventGroupCreate();
-
-int StateManager::getCountdownTimeInSeconds() {
-    return countdownTimeInSeconds;
-}
 
 GlobalState StateManager::getState() {
     return state;
 }
 
-void StateManager::setCalendarMonth(uint8_t m) {
+void StateManager::setCalendarMonth(const uint8_t m) {
     calendarMonth = m;
 }
 
-void StateManager::setCalendarYear(uint16_t y) {
+void StateManager::setCalendarYear(const uint16_t y) {
     calendarYear = y;
 }
 
@@ -49,17 +45,17 @@ const char *StateManager::getWeatherCityName() {
 }
 
 void StateManager::startWeatherQueryTask() {
-    // 每30s调用心知天气获取一次当前实时天气
+    // 每60s调用心知天气获取一次当前实时天气
     xTaskCreate([](void *ptr) {
         while (true) {
             WeatherInfo result = weatherQuery.getRealtimeWeatherInfo();
             updateWeather(result);
-            vTaskDelay(pdMS_TO_TICKS(30000));
+            vTaskDelay(pdMS_TO_TICKS(60000));
         }
     }, "weather-query-task", 8192, nullptr, 1, nullptr);
 }
 
-void StateManager::updateState(GlobalState newState) {
+void StateManager::updateState(const GlobalState newState) {
     state = newState;
     xEventGroupSetBits(eventGroup, EVENT_STATE_CHANGED); // 状态发生变化时，通知OLED显示任务
 }
@@ -74,7 +70,7 @@ WeatherInfo StateManager::getWeatherInfo() {
 }
 
 void StateManager::updateStateByMenuItemIndex() {
-    switch (menuItemIndex) {
+    switch (menuIndex) {
         case 1:
             state = DisplayClock;
             break;
@@ -85,6 +81,7 @@ void StateManager::updateStateByMenuItemIndex() {
             state = DisplayWeather;
             break;
         case 4:
+            buzzer.reset(); // 重新设置倒计时，把蜂鸣器状态重置一下
             state = DisplayCountdownSet;
             break;
         default:
@@ -109,79 +106,40 @@ void StateManager::decreaseCalendarMonth() {
 }
 
 void StateManager::increaseMenuIndex() {
-    menuItemIndex++;
-    if (menuItemIndex == 5) {
-        menuItemIndex = 1;
+    menuIndex++;
+    if (menuIndex == 5) {
+        menuIndex = 1;
     }
 }
 
 void StateManager::decreaseMenuIndex() {
-    menuItemIndex--;
-    if (menuItemIndex == 0) {
-        menuItemIndex = 4;
+    menuIndex--;
+    if (menuIndex == 0) {
+        menuIndex = 4;
     }
 }
 
 int StateManager::getMenuItemIndex() {
-    return menuItemIndex;
+    return menuIndex;
 }
 
-void StateManager::increaseCountdownIndicator() {
-    countdownIndicator++;
-    if (countdownIndicator == 5) {
-        countdownIndicator = 1;
-    }
-}
-
-void StateManager::decreaseCountdownIndicator() {
-    countdownIndicator--;
-    if (countdownIndicator == 0) {
-        countdownIndicator = 4;
-    }
-}
-
-int StateManager::getCountdownIndicator() {
-    return countdownIndicator;
+CountdownInfo &StateManager::getCountdownInfo() {
+    return countdownInfo;
 }
 
 void StateManager::increaseCountdownTime() {
-    switch (countdownIndicator) {
+    switch (getCountdownInfo().countdownIndicator) {
+        case 0:
+            getCountdownInfo().number1 = (getCountdownInfo().number1 + 1) % 6;
+            break;
         case 1:
-            countdownTime += 1000;
-            if (countdownTime / 1000 > 9) {
-                countdownTime -= 10000;
-            }
+            getCountdownInfo().number2 = (getCountdownInfo().number2 + 1) % 10;
             break;
         case 2:
-            countdownTime += 100;
-            if (countdownTime / 100 % 10 == 0) {
-                countdownTime -= 1000;
-            }
-            break;
-        case 3:
-            countdownTime += 10;
-            if (countdownTime / 10 % 10 == 0) {
-                countdownTime -= 100;
-            }
+            getCountdownInfo().number3 = (getCountdownInfo().number3 + 1) % 6;
             break;
         default:
-            countdownTime++;
-            if (countdownTime % 10 == 0) {
-                countdownTime -= 10;
-            }
+            getCountdownInfo().number4 = (getCountdownInfo().number4 + 1) % 10;
+            break;
     }
-}
-
-int StateManager::getCountdownTime() {
-    return countdownTime;
-}
-
-unsigned long StateManager::getCountdownStartMillis() {
-    return countdownStartMillis;
-}
-
-void StateManager::updateCountdownTimeInSeconds() {
-    countdownTimeInSeconds = (countdownTime / 1000 * 10 + countdownTime / 100 % 10) * 60 + (
-                                 countdownTime / 10 % 10 * 10 + countdownTime % 10);
-    countdownStartMillis = millis();
 }

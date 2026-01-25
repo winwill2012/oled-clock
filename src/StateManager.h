@@ -15,11 +15,21 @@ enum GlobalState {
     DisplayWeather,
 };
 
+struct CountdownInfo {
+    uint8_t number1 = 0;
+    uint8_t number2 = 0;
+    uint8_t number3 = 0;
+    uint8_t number4 = 0;
+    unsigned long countdownStartMillis;
+    int countdownTimeInSeconds;
+    uint8_t countdownIndicator = 0;
+};
+
 class StateManager {
 public:
     static void startWeatherQueryTask();
 
-    static void updateState(GlobalState state);
+    static void updateState(GlobalState newState);
 
     static void updateWeather(const WeatherInfo &info);
 
@@ -37,21 +47,9 @@ public:
 
     static int getMenuItemIndex();
 
-    static void increaseCountdownIndicator();
-
-    static void decreaseCountdownIndicator();
-
-    static int getCountdownIndicator();
+    static CountdownInfo &getCountdownInfo();
 
     static void increaseCountdownTime();
-
-    static int getCountdownTime();
-
-    static unsigned long getCountdownStartMillis();
-
-    static void updateCountdownTimeInSeconds();
-
-    static int getCountdownTimeInSeconds();
 
     static GlobalState getState();
 
@@ -68,11 +66,8 @@ public:
     static const char *getWeatherCityName();
 
 private:
-    static int menuItemIndex;
-    static int countdownIndicator; // 倒计时页面，当前指示标需要现在哪位数字下面
-    static int countdownTime; // 设置的倒计时，默认5分钟，对应500
-    static int countdownTimeInSeconds; // 设置的倒计时对应的秒数
-    static unsigned long countdownStartMillis; // 开始倒计时时的单片机时间，单位毫秒
+    static int menuIndex;
+    static CountdownInfo countdownInfo; // 开始倒计时时的单片机时间，单位毫秒
     static GlobalState state;
     static EventGroupHandle_t eventGroup;
     static uint16_t calendarYear;

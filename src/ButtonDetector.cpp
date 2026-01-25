@@ -16,9 +16,11 @@ void left_button_click() {
         case DisplayMainMenu:
             StateManager::decreaseMenuIndex();
             break;
-        case DisplayCountdownSet:
-            StateManager::decreaseCountdownIndicator();
+        case DisplayCountdownSet: {
+            StateManager::getCountdownInfo().countdownIndicator =
+                    (StateManager::getCountdownInfo().countdownIndicator + 3) % 4;
             break;
+        }
         default:
             break;
     }
@@ -46,33 +48,16 @@ void right_button_click() {
             StateManager::increaseMenuIndex();
             break;
         case DisplayCountdownSet:
-            StateManager::increaseCountdownIndicator();
+            StateManager::getCountdownInfo().countdownIndicator =
+                    (StateManager::getCountdownInfo().countdownIndicator + 1) % 4;
             break;
         default:
             break;
     }
-}
-
-void left_button_long_press() {
-    Serial.println("左边按钮长按");
 }
 
 void center_button_long_press() {
-    switch (StateManager::getState()) {
-        case DisplayCountdownSet:
-            StateManager::updateState(DisplayCountdown);
-            break;
-        default:
-            StateManager::updateState(DisplayMainMenu);
-    }
-}
-
-void right_button_long_press() {
-    Serial.println("右边按钮长按");
-}
-
-void left_button_double_click() {
-    Serial.println("左边按钮双击");
+    StateManager::updateState(DisplayMainMenu);
 }
 
 void center_button_double_click() {
@@ -86,13 +71,18 @@ void center_button_double_click() {
             StateManager::setCalendarMonth(timeInfo.tm_mon + 1);
             break;
         }
+        case DisplayCountdownSet:
+            StateManager::getCountdownInfo().countdownStartMillis = millis();
+            StateManager::getCountdownInfo().countdownTimeInSeconds =
+                    (StateManager::getCountdownInfo().number1 * 10 + StateManager::getCountdownInfo().number2) * 60 + (
+                        StateManager::getCountdownInfo().number3 * 10 + StateManager::getCountdownInfo().number4);
+            Serial.printf("确定倒计时时间: %d, %ld\n", StateManager::getCountdownInfo().countdownTimeInSeconds,
+                          StateManager::getCountdownInfo().countdownStartMillis);
+            StateManager::updateState(DisplayCountdown);
+            break;
         default:
             break;
     }
-}
-
-void right_button_double_click() {
-    Serial.println("右边按钮双击");
 }
 
 void ButtonDetector::begin() {
@@ -104,13 +94,8 @@ void ButtonDetector::begin() {
     centerButton.attachClick(center_button_click);
     rightButton.attachClick(right_button_click);
 
-    leftButton.attachLongPressStart(left_button_long_press);
     centerButton.attachLongPressStart(center_button_long_press);
-    rightButton.attachLongPressStart(right_button_long_press);
-
-    leftButton.attachDoubleClick(left_button_double_click);
     centerButton.attachDoubleClick(center_button_double_click);
-    rightButton.attachDoubleClick(right_button_double_click);
 
     xTaskCreate([](void *) {
         while (true) {

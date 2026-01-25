@@ -28,8 +28,6 @@ public:
 
     void displayConnectWifiTips();
 
-    void drawPageIndicator(int item);
-
     // 显示时钟界面
     void displayClock();
 
