@@ -1,9 +1,6 @@
 #ifndef OLED_CLOCK_STATEMANAGER_H
 #define OLED_CLOCK_STATEMANAGER_H
 #include <Arduino.h>
-#include <WiFiUdp.h>
-
-#include "NTPClient.h"
 #include "WeatherQuery.h"
 
 #define EVENT_STATE_CHANGED (1<<0)
@@ -13,13 +10,14 @@ enum GlobalState {
     DisplayMainMenu,
     DisplayClock,
     DisplayCountdown,
+    DisplayCountdownSet, // 倒计时设置状态
     DisplayCalendar,
     DisplayWeather,
 };
 
 class StateManager {
 public:
-    static void startWeatherQuery();
+    static void startWeatherQueryTask();
 
     static void updateState(GlobalState state);
 
@@ -39,7 +37,21 @@ public:
 
     static int getMenuItemIndex();
 
-    static NTPClient &getTimeClient();
+    static void increaseCountdownIndicator();
+
+    static void decreaseCountdownIndicator();
+
+    static int getCountdownIndicator();
+
+    static void increaseCountdownTime();
+
+    static int getCountdownTime();
+
+    static unsigned long getCountdownStartMillis();
+
+    static void updateCountdownTimeInSeconds();
+
+    static int getCountdownTimeInSeconds();
 
     static GlobalState getState();
 
@@ -53,19 +65,18 @@ public:
 
     static EventGroupHandle_t getEventGroup();
 
-    static uint16_t getWeatherCityId();
-
     static const char *getWeatherCityName();
 
 private:
     static int menuItemIndex;
-    static WiFiUDP wifiUdp;
-    static NTPClient timeClient;
+    static int countdownIndicator; // 倒计时页面，当前指示标需要现在哪位数字下面
+    static int countdownTime; // 设置的倒计时，默认5分钟，对应500
+    static int countdownTimeInSeconds; // 设置的倒计时对应的秒数
+    static unsigned long countdownStartMillis; // 开始倒计时时的单片机时间，单位毫秒
     static GlobalState state;
     static EventGroupHandle_t eventGroup;
     static uint16_t calendarYear;
     static uint8_t calendarMonth;
-    static uint16_t weatherCityId;
     static const char *weatherCityName;
     static WeatherInfo weatherInfo;
 };

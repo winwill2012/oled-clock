@@ -2,12 +2,14 @@
 #include "StateManager.h"
 #include "bitmap.h"
 #include "CommonUtils.h"
+#include "NTPClient.h"
 #include "WeatherQuery.h"
 
-tm timeInfo{};
 String clockWeekDays[7] = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
 String calendarWeekDays[7] = {"日", "一", "二", "三", "四", "五", "六"};
 String menuItemNames[6] = {"计时", "时钟", "日历", "天气", "计时", "时钟"};
+extern NTPClient timeClient;
+extern tm timeInfo;
 
 OledDisplay::OledDisplay(const uint8_t sda, const uint8_t scl) : u8g2(U8G2_R0, scl, sda) {
 }
@@ -17,12 +19,37 @@ void OledDisplay::begin() {
     u8g2.enableUTF8Print();
 }
 
+constexpr int PARTICLE_COUNT = 96;
+constexpr int AREA_X = 10;
+constexpr int AREA_Y = 16;
+constexpr int AREA_W = 48;
+constexpr int AREA_H = 48;
+
+// 粒子结构体
+struct Particle {
+    int x;
+    int y;
+    int dx; // X方向速度
+    int dy; // Y方向速度
+};
+
+Particle particles[PARTICLE_COUNT];
+
 void OledDisplay::loop() {
-    StateManager::getTimeClient().begin();
-    while (!StateManager::getTimeClient().update()) {
+    // 设置随机种子
+    randomSeed(analogRead(0));
+    // 初始化天气页面左侧的所有粒子的初始位置
+    for (auto &particle: particles) {
+        particle.x = AREA_X + random(AREA_W);
+        particle.y = AREA_Y + random(AREA_H);
+        particle.dx = (random(2) == 0) ? 1 : -1;
+        particle.dy = (random(2) == 0) ? 1 : -1;
+    }
+    timeClient.begin();
+    while (!timeClient.update()) {
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
-    unsigned long localEpochTime = StateManager::getTimeClient().getEpochTime();
+    unsigned long localEpochTime = timeClient.getEpochTime();
     gmtime_r(reinterpret_cast<time_t *>(&localEpochTime), &timeInfo);
     StateManager::setCalendarYear(timeInfo.tm_year + 1900);
     StateManager::setCalendarMonth(timeInfo.tm_mon + 1);
@@ -35,6 +62,9 @@ void OledDisplay::loop() {
                     break;
                 case DisplayClock:
                     display->displayClock();
+                    break;
+                case DisplayCountdownSet:
+                    display->displayCountdownSet();
                     break;
                 case DisplayCountdown:
                     display->displayCountdown();
@@ -53,39 +83,34 @@ void OledDisplay::loop() {
     }, "oled-display", 8192, this, 1, nullptr);
 }
 
-uint8_t *getBitmapByDigit(const int value, int round, const bool reverse = false) {
-    if (round == 0) {
-        round = 5;
+const uint8_t *getBitmapByDigit(const int value) {
+    switch (value) {
+        case 0: return IMAGE_0;
+        case 1: return IMAGE_1;
+        case 2: return IMAGE_2;
+        case 3: return IMAGE_3;
+        case 4: return IMAGE_4;
+        case 5: return IMAGE_5;
+        case 6: return IMAGE_6;
+        case 7: return IMAGE_7;
+        case 8: return IMAGE_8;
+        default: return IMAGE_9;
     }
-    static uint8_t buffer[SINGLE_DIGIT_LENGTH];
-    int beginIndex;
-    if (reverse) {
-        beginIndex = (value * SINGLE_DIGIT_LENGTH + (5 - round) * SINGLE_DIGIT_LENGTH / 4) % (
-                         SINGLE_DIGIT_LENGTH * 10);
-    } else {
-        beginIndex = ((value * SINGLE_DIGIT_LENGTH + SINGLE_DIGIT_LENGTH * 10) - (5 - round) *
-                      SINGLE_DIGIT_LENGTH / 4) %
-                     (SINGLE_DIGIT_LENGTH * 10);
-    }
-    for (int i = 0; i < SINGLE_DIGIT_LENGTH; i++) {
-        buffer[i] = COMBINED_IMAGE[beginIndex++];
-    }
-    return buffer;
 }
 
-uint8_t *getBitmapBySmallDigit(const int value, int round) {
-    if (round == 0) {
-        round = 5;
+const uint8_t *getBitmapBySmallDigit(const int value) {
+    switch (value) {
+        case 0: return IMAGE_MINI_0;
+        case 1: return IMAGE_MINI_1;
+        case 2: return IMAGE_MINI_2;
+        case 3: return IMAGE_MINI_3;
+        case 4: return IMAGE_MINI_4;
+        case 5: return IMAGE_MINI_5;
+        case 6: return IMAGE_MINI_6;
+        case 7: return IMAGE_MINI_7;
+        case 8: return IMAGE_MINI_8;
+        default: return IMAGE_MINI_9;
     }
-    static uint8_t buffer[SINGLE_SMALL_DIGIT_LENGTH];
-    int beginIndex = ((value * SINGLE_SMALL_DIGIT_LENGTH + SINGLE_SMALL_DIGIT_LENGTH * 10) - (5 - round) *
-                      SINGLE_SMALL_DIGIT_LENGTH /
-                      4) %
-                     (SINGLE_SMALL_DIGIT_LENGTH * 10);
-    for (int i = 0; i < SINGLE_SMALL_DIGIT_LENGTH; i++) {
-        buffer[i] = COMBINED_MINI_IMAGE[beginIndex++];
-    }
-    return buffer;
 }
 
 void OledDisplay::displayMainMenu() {
@@ -143,8 +168,8 @@ void OledDisplay::drawPageIndicator(int item) {
 
 void OledDisplay::displayClock() {
     // 获取当前时间
-    StateManager::getTimeClient().update();
-    unsigned long localEpochTime = StateManager::getTimeClient().getEpochTime();
+    timeClient.update();
+    unsigned long localEpochTime = timeClient.getEpochTime();
     gmtime_r(reinterpret_cast<time_t *>(&localEpochTime), &timeInfo);
     // 渲染时间
     u8g2.firstPage();
@@ -158,30 +183,74 @@ void OledDisplay::displayClock() {
         u8g2.setFont(u8g2_font_wqy12_t_gb2312);
         u8g2.drawUTF8((u8g2.getDisplayWidth() - u8g2.getUTF8Width(date)) / 2,
                       u8g2.getAscent() + 2, date);
-        u8g2.drawBitmap(4, 20, 3, 32, getBitmapByDigit(timeInfo.tm_hour / 10, 0));
-        u8g2.drawBitmap(28, 20, 3, 32, getBitmapByDigit(timeInfo.tm_hour % 10, 0));
+        u8g2.drawBitmap(4, 20, 3, 32, getBitmapByDigit(timeInfo.tm_hour / 10));
+        u8g2.drawBitmap(28, 20, 3, 32, getBitmapByDigit(timeInfo.tm_hour % 10));
         u8g2.drawBitmap(52, 20, 1, 32, IMAGE_DOT);
-        u8g2.drawBitmap(60, 20, 3, 32, getBitmapByDigit(timeInfo.tm_min / 10, 0));
-        u8g2.drawBitmap(84, 20, 3, 32, getBitmapByDigit(timeInfo.tm_min % 10, 0));
-        u8g2.drawBitmap(108, 40, 1, 12, getBitmapBySmallDigit(timeInfo.tm_sec / 10, 0));
-        u8g2.drawBitmap(116, 40, 1, 12, getBitmapBySmallDigit(timeInfo.tm_sec % 10, 0));
-        // drawPageIndicator(2);
-        u8g2.setFont(u8g2_font_open_iconic_weather_2x_t);
-        u8g2.setFontPosTop();
-        // u8g2.drawGlyph(108, 18, 0x0040);  // 天阴
-        // u8g2.drawGlyph(108, 18, 0x0041);  // 多云
-        // u8g2.drawGlyph(108, 18, 0x0042);  // 月亮
-        // u8g2.drawGlyph(108, 18, 0x0043);  // 下雨
-        // u8g2.drawGlyph(108, 18, 0x0044);  // 星星
-        u8g2.drawGlyph(108, 18, 0x0045); // 天晴
-        u8g2.setFontPosBaseline();
+        u8g2.drawBitmap(60, 20, 3, 32, getBitmapByDigit(timeInfo.tm_min / 10));
+        u8g2.drawBitmap(84, 20, 3, 32, getBitmapByDigit(timeInfo.tm_min % 10));
+        u8g2.drawBitmap(108, 40, 1, 12, getBitmapBySmallDigit(timeInfo.tm_sec / 10));
+        u8g2.drawBitmap(116, 40, 1, 12, getBitmapBySmallDigit(timeInfo.tm_sec % 10));
+    } while (u8g2.nextPage());
+}
+
+void OledDisplay::drawCountdownIndicator(const uint8_t numberIndex) {
+    constexpr uint8_t line1Y = 60;
+    constexpr uint8_t line2Y = line1Y + 1;
+    constexpr uint8_t line3Y = line2Y + 1;
+    uint8_t centerX = 0;
+    // 计算每一位数字的指示箭头的横坐标
+    switch (numberIndex) {
+        case 1:
+            centerX = 24;
+            break;
+        case 2:
+            centerX = 48;
+            break;
+        case 3:
+            centerX = 80;
+            break;
+        case 4:
+            centerX = 104;
+            break;
+        default:
+            centerX = -10; // 无效值
+            break;
+    }
+    u8g2.drawPixel(centerX, line1Y);
+    u8g2.drawPixel(centerX - 1, line2Y);
+    u8g2.drawPixel(centerX, line2Y);
+    u8g2.drawPixel(centerX + 1, line2Y);
+    u8g2.drawPixel(centerX - 2, line3Y);
+    u8g2.drawPixel(centerX - 1, line3Y);
+    u8g2.drawPixel(centerX, line3Y);
+    u8g2.drawPixel(centerX + 1, line3Y);
+    u8g2.drawPixel(centerX + 2, line3Y);
+}
+
+void OledDisplay::displayCountdownSet() {
+    u8g2.firstPage();
+    do {
+        drawWiFiAndBattery("倒计时设置");
+        u8g2.drawBitmap(12, 20, 3, 32, getBitmapByDigit(StateManager::getCountdownTime() / 1000));
+        u8g2.drawBitmap(36, 20, 3, 32, getBitmapByDigit(StateManager::getCountdownTime() / 100 % 10));
+        u8g2.drawBitmap(60, 20, 1, 32, IMAGE_DOT);
+        u8g2.drawBitmap(68, 20, 3, 32, getBitmapByDigit(StateManager::getCountdownTime() / 10 % 10));
+        u8g2.drawBitmap(92, 20, 3, 32, getBitmapByDigit(StateManager::getCountdownTime() % 10));
+        drawCountdownIndicator(StateManager::getCountdownIndicator());
     } while (u8g2.nextPage());
 }
 
 void OledDisplay::displayCountdown() {
+    const int time = StateManager::getCountdownTimeInSeconds() - static_cast<int>(
+                         (millis() - StateManager::getCountdownStartMillis()) / 1000);
     u8g2.firstPage();
     do {
         drawWiFiAndBattery("倒计时");
+        u8g2.drawBitmap(12, 20, 3, 32, getBitmapByDigit(time / 60 / 10));
+        u8g2.drawBitmap(36, 20, 3, 32, getBitmapByDigit(time / 60 % 10));
+        u8g2.drawBitmap(60, 20, 1, 32, IMAGE_DOT);
+        u8g2.drawBitmap(68, 20, 3, 32, getBitmapByDigit(time % 60 / 10));
+        u8g2.drawBitmap(92, 20, 3, 32, getBitmapByDigit(time % 60));
     } while (u8g2.nextPage());
 }
 
@@ -238,22 +307,38 @@ void OledDisplay::displayCalendar() {
  * 显示天气情况
  */
 void OledDisplay::displayWeather() {
-    u8g2.firstPage();
+    // 计算坐标随机粒子的坐标
+    for (int i = 0; i < PARTICLE_COUNT; i++) {
+        particles[i].x += particles[i].dx;
+        particles[i].y += particles[i].dy;
+        // 碰到边界反弹
+        if (particles[i].x <= AREA_X || particles[i].x >= AREA_X + AREA_W - 1) {
+            particles[i].dx *= -1;
+        }
+        if (particles[i].y <= AREA_Y || particles[i].y >= AREA_Y + AREA_H - 1) {
+            particles[i].dy *= -1;
+        }
+    }
+    // 获取当前天气情况
     auto weatherInfo = StateManager::getWeatherInfo();
     char temp[15];
-    snprintf(temp, sizeof(temp), "%s℃", weatherInfo.temperature);
+    snprintf(temp, sizeof(temp), "%s℃", weatherInfo.temperature.c_str());
+
+    // 开始渲染画面
+    u8g2.firstPage();
     do {
         drawWiFiAndBattery("当前天气");
         u8g2.setFont(u8g2_font_wqy12_t_gb2312);
-        u8g2.drawButtonUTF8(93, 32,
+        u8g2.drawButtonUTF8(93, 28,
                             U8G2_BTN_HCENTER | U8G2_BTN_INV | U8G2_BTN_BW1 | U8G2_BTN_SHADOW1, 0, 1, 2,
-                            weatherInfo.cityName);
+                            weatherInfo.cityName.c_str());
         u8g2.drawUTF8(66, 56, temp);
         u8g2.drawUTF8(90, 56, "|");
-        u8g2.drawUTF8(97, 56, "24%");
-        u8g2.drawVLine(58, 16, u8g2.getDisplayHeight() - 16);
-        u8g2.setFont(u8g2_font_open_iconic_weather_6x_t);
-        u8g2.drawGlyph(5, 64, 0x0045);
+        u8g2.drawUTF8(97, 56, WeatherQuery::getChineseDescription(weatherInfo.weatherCode.c_str()));
+        // 绘制所有粒子
+        for (const auto &particle: particles) {
+            u8g2.drawPixel(particle.x, particle.y);
+        }
     } while (u8g2.nextPage());
 }
 

@@ -3,15 +3,24 @@
 #include <HTTPClient.h>
 
 struct WeatherInfo {
-    const char *cityName; // 城市
-    const char *temperature; // 当前温度
-    const char *weatherCode; // 天气情况代码
-    const char *weather; // 天气情况
-    WeatherInfo(const char *cityName, const char *temperature, const char *weatherCode, const char *weather) {
+    String cityName; // 城市
+    String temperature; // 当前温度
+    String weatherCode; // 天气情况代码
+    String weather; // 天气情况
+    WeatherInfo(const String &cityName, const String &temperature,
+                const String &weatherCode,
+                const String &weather) {
         this->cityName = cityName;
         this->temperature = temperature;
         this->weatherCode = weatherCode;
         this->weather = weather;
+    }
+
+    String toString() const {
+        return String("城市: ") + cityName +
+               ", 天气代码：" + weatherCode +
+               ", 天气情况: " + weather +
+               ", 当前温度: " + temperature;
     }
 };
 
@@ -24,6 +33,8 @@ public:
     const char *getLocation() const;
 
     WeatherInfo getRealtimeWeatherInfo();
+
+    static const char *getChineseDescription(const char *code);
 
 private:
     HTTPClient httpClient;

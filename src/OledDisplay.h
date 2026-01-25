@@ -33,6 +33,12 @@ public:
     // 显示时钟界面
     void displayClock();
 
+    // 显示倒计时页面中数字指示箭头
+    void drawCountdownIndicator(uint8_t numberIndex);
+
+    // 显示倒计时设置界面
+    void displayCountdownSet();
+
     // 显示倒计时界面
     void displayCountdown();
 

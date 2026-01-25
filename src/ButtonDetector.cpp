@@ -1,9 +1,12 @@
 #include "ButtonDetector.h"
+
+#include "NTPClient.h"
 #include "StateManager.h"
 
 OneButton ButtonDetector::leftButton = OneButton(BUTTON_LEFT_PIN, true, true);
 OneButton ButtonDetector::centerButton = OneButton(BUTTON_CENTER_PIN, true, true);
 OneButton ButtonDetector::rightButton = OneButton(BUTTON_RIGHT_PIN, true, true);
+extern NTPClient timeClient;
 
 void left_button_click() {
     switch (StateManager::getState()) {
@@ -12,6 +15,9 @@ void left_button_click() {
             break;
         case DisplayMainMenu:
             StateManager::decreaseMenuIndex();
+            break;
+        case DisplayCountdownSet:
+            StateManager::decreaseCountdownIndicator();
             break;
         default:
             break;
@@ -22,6 +28,9 @@ void center_button_click() {
     switch (StateManager::getState()) {
         case DisplayMainMenu:
             StateManager::updateStateByMenuItemIndex();
+            break;
+        case DisplayCountdownSet:
+            StateManager::increaseCountdownTime();
             break;
         default:
             break;
@@ -36,6 +45,9 @@ void right_button_click() {
         case DisplayMainMenu:
             StateManager::increaseMenuIndex();
             break;
+        case DisplayCountdownSet:
+            StateManager::increaseCountdownIndicator();
+            break;
         default:
             break;
     }
@@ -46,8 +58,13 @@ void left_button_long_press() {
 }
 
 void center_button_long_press() {
-    Serial.println("中间按钮长按");
-    StateManager::updateState(DisplayMainMenu);
+    switch (StateManager::getState()) {
+        case DisplayCountdownSet:
+            StateManager::updateState(DisplayCountdown);
+            break;
+        default:
+            StateManager::updateState(DisplayMainMenu);
+    }
 }
 
 void right_button_long_press() {
@@ -61,9 +78,9 @@ void left_button_double_click() {
 void center_button_double_click() {
     switch (StateManager::getState()) {
         case DisplayCalendar: {
-            tm timeInfo;
-            StateManager::getTimeClient().update(); // update函数内部做了更新间隔检测，并不会每一次都从网络获取时间
-            unsigned long localEpochTime = StateManager::getTimeClient().getEpochTime();
+            tm timeInfo{};
+            timeClient.update(); // update函数内部做了更新间隔检测，并不会每一次都从网络获取时间
+            unsigned long localEpochTime = timeClient.getEpochTime();
             gmtime_r(reinterpret_cast<time_t *>(&localEpochTime), &timeInfo);
             StateManager::setCalendarYear(timeInfo.tm_year + 1900);
             StateManager::setCalendarMonth(timeInfo.tm_mon + 1);
@@ -95,7 +112,7 @@ void ButtonDetector::begin() {
     centerButton.attachDoubleClick(center_button_double_click);
     rightButton.attachDoubleClick(right_button_double_click);
 
-    xTaskCreate([](void *ptr) {
+    xTaskCreate([](void *) {
         while (true) {
             leftButton.tick();
             centerButton.tick();

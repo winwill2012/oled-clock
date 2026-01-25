@@ -1,23 +1,23 @@
 #include "StateManager.h"
-
 #include "WeatherQuery.h"
 
 int StateManager::menuItemIndex = 1;
-WiFiUDP StateManager::wifiUdp;
-NTPClient StateManager::timeClient = NTPClient(wifiUdp, "time1.aliyun.com", 28800);
+int StateManager::countdownIndicator = 1;
+int StateManager::countdownTime = 500;
+int StateManager::countdownTimeInSeconds = 300;
+unsigned long StateManager::countdownStartMillis;
 GlobalState StateManager::state = DisplayClock;
 uint16_t StateManager::calendarYear;
 uint8_t StateManager::calendarMonth;
-uint16_t StateManager::weatherCityId = 100;
 const char *StateManager::weatherCityName = "昆明";
-WeatherInfo StateManager::weatherInfo = {"", "", "", ""};
+WeatherInfo StateManager::weatherInfo = {weatherCityName, "0", "1", "晴"};
 
 extern WeatherQuery weatherQuery;
 
 EventGroupHandle_t StateManager::eventGroup = xEventGroupCreate();
 
-NTPClient &StateManager::getTimeClient() {
-    return timeClient;
+int StateManager::getCountdownTimeInSeconds() {
+    return countdownTimeInSeconds;
 }
 
 GlobalState StateManager::getState() {
@@ -44,21 +44,19 @@ EventGroupHandle_t StateManager::getEventGroup() {
     return eventGroup;
 }
 
-uint16_t StateManager::getWeatherCityId() {
-    return weatherCityId;
-}
-
 const char *StateManager::getWeatherCityName() {
     return weatherCityName;
 }
 
-
-void StateManager::startWeatherQuery() {
-    const auto timer = xTimerCreate("weather-query-timer", pdMS_TO_TICKS(60000), pdTRUE, nullptr, [](void *ptr) {
-        const auto result = weatherQuery.getRealtimeWeatherInfo();
-        updateWeather(result);
-    });
-    xTimerStart(timer, 0);
+void StateManager::startWeatherQueryTask() {
+    // 每30s调用心知天气获取一次当前实时天气
+    xTaskCreate([](void *ptr) {
+        while (true) {
+            WeatherInfo result = weatherQuery.getRealtimeWeatherInfo();
+            updateWeather(result);
+            vTaskDelay(pdMS_TO_TICKS(30000));
+        }
+    }, "weather-query-task", 8192, nullptr, 1, nullptr);
 }
 
 void StateManager::updateState(GlobalState newState) {
@@ -67,6 +65,7 @@ void StateManager::updateState(GlobalState newState) {
 }
 
 void StateManager::updateWeather(const WeatherInfo &info) {
+    Serial.printf("更新天气信息: %s\n", info.toString().c_str());
     weatherInfo = info;
 }
 
@@ -86,7 +85,7 @@ void StateManager::updateStateByMenuItemIndex() {
             state = DisplayWeather;
             break;
         case 4:
-            state = DisplayCountdown;
+            state = DisplayCountdownSet;
             break;
         default:
             break;
@@ -125,4 +124,64 @@ void StateManager::decreaseMenuIndex() {
 
 int StateManager::getMenuItemIndex() {
     return menuItemIndex;
+}
+
+void StateManager::increaseCountdownIndicator() {
+    countdownIndicator++;
+    if (countdownIndicator == 5) {
+        countdownIndicator = 1;
+    }
+}
+
+void StateManager::decreaseCountdownIndicator() {
+    countdownIndicator--;
+    if (countdownIndicator == 0) {
+        countdownIndicator = 4;
+    }
+}
+
+int StateManager::getCountdownIndicator() {
+    return countdownIndicator;
+}
+
+void StateManager::increaseCountdownTime() {
+    switch (countdownIndicator) {
+        case 1:
+            countdownTime += 1000;
+            if (countdownTime / 1000 > 9) {
+                countdownTime -= 10000;
+            }
+            break;
+        case 2:
+            countdownTime += 100;
+            if (countdownTime / 100 % 10 == 0) {
+                countdownTime -= 1000;
+            }
+            break;
+        case 3:
+            countdownTime += 10;
+            if (countdownTime / 10 % 10 == 0) {
+                countdownTime -= 100;
+            }
+            break;
+        default:
+            countdownTime++;
+            if (countdownTime % 10 == 0) {
+                countdownTime -= 10;
+            }
+    }
+}
+
+int StateManager::getCountdownTime() {
+    return countdownTime;
+}
+
+unsigned long StateManager::getCountdownStartMillis() {
+    return countdownStartMillis;
+}
+
+void StateManager::updateCountdownTimeInSeconds() {
+    countdownTimeInSeconds = (countdownTime / 1000 * 10 + countdownTime / 100 % 10) * 60 + (
+                                 countdownTime / 10 % 10 * 10 + countdownTime % 10);
+    countdownStartMillis = millis();
 }
