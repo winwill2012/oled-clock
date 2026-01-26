@@ -338,6 +338,7 @@ void OledDisplay::displayWeather() {
         for (const auto &particle: particles) {
             u8g2.drawPixel(particle.x, particle.y);
         }
+        // u8g2.drawBitmap(5, 16, 6, 48, IMAGE_EARTH);
     } while (u8g2.nextPage());
 }
 
@@ -471,6 +472,7 @@ void OledDisplay::displayGame() {
         u8g2.drawButtonUTF8(114, 48, U8G2_BTN_BW1 | U8G2_BTN_INV | U8G2_BTN_HCENTER, 0, 1, 2, "纪录");
         u8g2.drawStr(102, 64, "9999");
         u8g2.drawBitmap(5, StateManager::getGameManY(), 4, 32, IMAGE_BIG_MAN);
+        u8g2.drawBitmap(35, 47, 2, 16, IMAGE_SMALL_MAN);
     } while (u8g2.nextPage());
     if (StateManager::getGameManY() == 0 && StateManager::getGameManDY() == -1) {
         StateManager::updateGameManDY(1);
