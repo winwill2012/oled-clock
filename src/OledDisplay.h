@@ -40,11 +40,20 @@ public:
     // 显示倒计时界面
     void displayCountdown();
 
+    // 显示秒表界面
+    void displayStopWatch();
+
     // 显示日历界面
     void displayCalendar();
 
     // 显示天气情况
     void displayWeather();
+
+    // 显示游戏界面中的小人
+    void drawGameMan();
+
+    // 显示游戏界面
+    void displayGame();
 
     void drawWiFiAndBattery(const char *title);
 

@@ -5,7 +5,12 @@
 
 int StateManager::menuIndex = 1;
 CountdownInfo StateManager::countdownInfo;
-GlobalState StateManager::state = DisplayClock;
+int StateManager::gameManY = 31;
+int StateManager::gameManDY = 0;
+unsigned long StateManager::stopWatchStartMills = 0;
+unsigned long StateManager::frozenStopWatchMills = 0;
+int StateManager::oledRefreshInterval = 100;
+GlobalState StateManager::state = DisplayGame;
 uint16_t StateManager::calendarYear;
 uint8_t StateManager::calendarMonth;
 const char *StateManager::weatherCityName = "昆明";
@@ -13,6 +18,7 @@ WeatherInfo StateManager::weatherInfo = {weatherCityName, "0", "1", "晴"};
 
 extern WeatherQuery weatherQuery;
 extern Buzzer buzzer;
+extern uint8_t menuSize;
 
 EventGroupHandle_t StateManager::eventGroup = xEventGroupCreate();
 
@@ -44,6 +50,57 @@ const char *StateManager::getWeatherCityName() {
     return weatherCityName;
 }
 
+void StateManager::startStopWatch() {
+    stopWatchStartMills = millis();
+}
+
+void StateManager::stopStopWatch() {
+    if (frozenStopWatchMills == 0) {
+        frozenStopWatchMills = millis() - stopWatchStartMills;
+    }
+    stopWatchStartMills = 0;
+}
+
+void StateManager::resetStopWatch() {
+    stopWatchStartMills = 0;
+    frozenStopWatchMills = 0;
+}
+
+int StateManager::getStopWatchMillis() {
+    if (frozenStopWatchMills > 0) {
+        return frozenStopWatchMills;
+    }
+    if (stopWatchStartMills > 0) {
+        return millis() - stopWatchStartMills;
+    }
+    return 0;
+}
+
+void StateManager::updateOledRefreshInterval(int t) {
+    oledRefreshInterval = t;
+}
+
+int StateManager::getOledRefreshInterval() {
+    return oledRefreshInterval;
+}
+
+int StateManager::getGameManY() {
+    return gameManY;
+}
+
+void StateManager::updateGameManY() {
+    gameManY += gameManDY;
+}
+
+int StateManager::getGameManDY() {
+    return gameManDY;
+}
+
+void StateManager::updateGameManDY(uint8_t d) {
+    gameManDY = d;
+}
+
+
 void StateManager::startWeatherQueryTask() {
     // 每60s调用心知天气获取一次当前实时天气
     xTaskCreate([](void *ptr) {
@@ -71,20 +128,24 @@ WeatherInfo StateManager::getWeatherInfo() {
 
 void StateManager::updateStateByMenuItemIndex() {
     switch (menuIndex) {
-        case 1:
+        case 0:
             state = DisplayClock;
             break;
-        case 2:
+        case 1:
             state = DisplayCalendar;
             break;
-        case 3:
+        case 2:
             state = DisplayWeather;
             break;
-        case 4:
+        case 3:
             buzzer.reset(); // 重新设置倒计时，把蜂鸣器状态重置一下
             state = DisplayCountdownSet;
             break;
+        case 4:
+            state = DisplayStopWatch;
+            break;
         default:
+            state = DisplayGame;
             break;
     }
 }
@@ -106,17 +167,11 @@ void StateManager::decreaseCalendarMonth() {
 }
 
 void StateManager::increaseMenuIndex() {
-    menuIndex++;
-    if (menuIndex == 5) {
-        menuIndex = 1;
-    }
+    menuIndex = (menuIndex + 1) % menuSize;
 }
 
 void StateManager::decreaseMenuIndex() {
-    menuIndex--;
-    if (menuIndex == 0) {
-        menuIndex = 4;
-    }
+    menuIndex = (menuIndex + menuSize - 1) % menuSize;
 }
 
 int StateManager::getMenuItemIndex() {

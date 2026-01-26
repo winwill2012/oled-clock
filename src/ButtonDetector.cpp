@@ -7,6 +7,7 @@ OneButton ButtonDetector::leftButton = OneButton(BUTTON_LEFT_PIN, true, true);
 OneButton ButtonDetector::centerButton = OneButton(BUTTON_CENTER_PIN, true, true);
 OneButton ButtonDetector::rightButton = OneButton(BUTTON_RIGHT_PIN, true, true);
 extern NTPClient timeClient;
+extern uint8_t menuSize;
 
 void left_button_click() {
     switch (StateManager::getState()) {
@@ -34,6 +35,24 @@ void center_button_click() {
         case DisplayCountdownSet:
             StateManager::increaseCountdownTime();
             break;
+        case DisplayStopWatch:
+            // 还没开始则开始计时
+            if (StateManager::getStopWatchMillis() == 0) {
+                StateManager::startStopWatch();
+                // 秒表模式，需要提高屏幕刷新频率
+                StateManager::updateOledRefreshInterval(1);
+            } else {
+                // 已经开始则停止计时
+                StateManager::stopStopWatch();
+                // 结束秒表模式，恢复低刷新率模式
+                StateManager::updateOledRefreshInterval(100);
+            }
+            break;
+        case DisplayGame:
+            if (StateManager::getGameManY() == 31) {
+                StateManager::updateGameManDY(-1);
+            }
+            break;
         default:
             break;
     }
@@ -58,6 +77,11 @@ void right_button_click() {
 
 void center_button_long_press() {
     StateManager::updateState(DisplayMainMenu);
+    StateManager::updateOledRefreshInterval(100);
+}
+
+void center_button_press() {
+    Serial.println("center_button_press");
 }
 
 void center_button_double_click() {
@@ -80,6 +104,10 @@ void center_button_double_click() {
                           StateManager::getCountdownInfo().countdownStartMillis);
             StateManager::updateState(DisplayCountdown);
             break;
+        case DisplayStopWatch:
+            // 秒表模式，双击重置
+            StateManager::resetStopWatch();
+            break;
         default:
             break;
     }
@@ -96,6 +124,7 @@ void ButtonDetector::begin() {
 
     centerButton.attachLongPressStart(center_button_long_press);
     centerButton.attachDoubleClick(center_button_double_click);
+    // centerButton.attachPress();
 
     xTaskCreate([](void *) {
         while (true) {

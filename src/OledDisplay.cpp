@@ -8,7 +8,8 @@
 
 String clockWeekDays[7] = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
 String calendarWeekDays[7] = {"日", "一", "二", "三", "四", "五", "六"};
-String menuItemNames[6] = {"计时", "时钟", "日历", "天气", "计时", "时钟"};
+String menuItemNames[] = {"时钟", "日历", "天气", "计时", "秒表", "游戏"};
+uint8_t menuSize = sizeof(menuItemNames) / sizeof(menuItemNames[0]);
 extern NTPClient timeClient;
 extern tm timeInfo;
 extern Buzzer buzzer;
@@ -62,6 +63,9 @@ void OledDisplay::loop() {
                 case DisplayMainMenu:
                     display->displayMainMenu();
                     break;
+                case DisplayStopWatch:
+                    display->displayStopWatch();
+                    break;
                 case DisplayClock:
                     display->displayClock();
                     break;
@@ -77,10 +81,13 @@ void OledDisplay::loop() {
                 case DisplayWeather:
                     display->displayWeather();
                     break;
+                case DisplayGame:
+                    display->displayGame();
+                    break;
                 default:
                     break;
             }
-            vTaskDelay(pdMS_TO_TICKS(100));
+            vTaskDelay(pdMS_TO_TICKS(StateManager::getOledRefreshInterval()));
         }
     }, "oled-display", 8192, this, 1, nullptr);
 }
@@ -121,11 +128,11 @@ void OledDisplay::displayMainMenu() {
         drawWiFiAndBattery("菜单选择");
         u8g2.setFont(u8g2_font_wqy16_t_gb2312);
         u8g2.drawButtonUTF8(21, 40,U8G2_BTN_HCENTER | U8G2_BTN_INV | U8G2_BTN_BW1, 0, 2, 4,
-                            menuItemNames[StateManager::getMenuItemIndex() - 1].c_str());
+                            menuItemNames[(StateManager::getMenuItemIndex() + menuSize - 1) % menuSize].c_str());
         u8g2.drawButtonUTF8(64, 40,U8G2_BTN_HCENTER | U8G2_BTN_INV | U8G2_BTN_BW1 | U8G2_BTN_SHADOW1, 0, 2, 6,
                             menuItemNames[StateManager::getMenuItemIndex()].c_str());
         u8g2.drawButtonUTF8(107, 40,U8G2_BTN_HCENTER | U8G2_BTN_INV | U8G2_BTN_BW1, 0, 2, 4,
-                            menuItemNames[StateManager::getMenuItemIndex() + 1].c_str());
+                            menuItemNames[(StateManager::getMenuItemIndex() + 1) % menuSize].c_str());
     } while (u8g2.nextPage());
 }
 
@@ -230,6 +237,22 @@ void OledDisplay::displayCountdown() {
     } while (u8g2.nextPage());
 }
 
+void OledDisplay::displayStopWatch() {
+    const int stopWatchMills = StateManager::getStopWatchMillis();
+    u8g2.firstPage();
+    do {
+        drawWiFiAndBattery("秒表");
+        u8g2.drawBitmap(12, 20, 3, 32, getBitmapByDigit(stopWatchMills / 1000 / 1000));
+        u8g2.drawBitmap(36, 20, 3, 32, getBitmapByDigit(stopWatchMills / 1000 % 100 / 10));
+        u8g2.drawBitmap(60, 20, 3, 32, getBitmapByDigit(stopWatchMills / 1000 % 10));
+        u8g2.drawBitmap(92, 40, 1, 12, getBitmapBySmallDigit(stopWatchMills % 1000 / 100));
+        u8g2.drawBitmap(100, 40, 1, 12, getBitmapBySmallDigit(stopWatchMills % 1000 % 100 / 10));
+        u8g2.drawBitmap(108, 40, 1, 12, getBitmapBySmallDigit(stopWatchMills % 1000 % 10));
+        u8g2.setFont(u8g2_font_wqy12_t_gb2312);
+        u8g2.drawUTF8(92, 30, "毫秒");
+    } while (u8g2.nextPage());
+}
+
 
 void OledDisplay::displayCalendar() {
     u8g2.firstPage();
@@ -316,6 +339,144 @@ void OledDisplay::displayWeather() {
             u8g2.drawPixel(particle.x, particle.y);
         }
     } while (u8g2.nextPage());
+}
+
+struct GameManPoint {
+    int8_t x;
+    int8_t y;
+    int dy;
+};
+
+GameManPoint gameManPoints[] = {
+    // 图像最底部行（y=63，屏幕最下方）
+    {8, 63, 0},
+    {15, 63, 0},
+
+    // 图像倒数第2行（y=62，在y=63上方）
+    {8, 62, 0},
+    {15, 62, 0},
+    {16, 62, 0},
+
+    // 图像倒数第3行（y=61）
+    {8, 61, 0},
+    {15, 61, 0},
+    {16, 61, 0},
+
+    // 图像倒数第4行（y=60）
+    {8, 60, 0},
+
+    // 跳过无显示的y=59行
+
+    // 图像倒数第6行（y=58）
+    {8, 58, 0},
+    {11, 58, 0},
+    {12, 58, 0},
+    {13, 58, 0},
+
+    // 图像倒数第7行（y=57）
+    {8, 57, 0},
+    {9, 57, 0},
+    {10, 57, 0},
+    {11, 57, 0},
+    {12, 57, 0},
+    {13, 57, 0},
+    {14, 57, 0},
+    {15, 57, 0},
+    {16, 57, 0},
+    {17, 57, 0},
+    {18, 57, 0},
+    {19, 57, 0},
+
+    // 图像倒数第8行（y=56）
+    {8, 56, 0},
+    {9, 56, 0},
+    {10, 56, 0},
+    {12, 56, 0},
+    {13, 56, 0},
+    {14, 56, 0},
+    {15, 56, 0},
+    {16, 56, 0},
+    {17, 56, 0},
+    {18, 56, 0},
+    {19, 56, 0},
+
+    // 图像倒数第9行（y=55）
+    {8, 55, 0},
+    {9, 55, 0},
+    {13, 55, 0},
+
+    // 图像倒数第10行（y=54）
+    {8, 54, 0},
+    {9, 54, 0},
+    {13, 54, 0},
+    {15, 54, 0},
+    {16, 54, 0},
+
+    // 图像倒数第11行（y=53）
+    {8, 53, 0},
+    {15, 53, 0},
+    {16, 53, 0},
+    {17, 53, 0},
+
+    // 图像倒数第12行（y=52）
+    {8, 52, 0},
+    {9, 52, 0},
+    {14, 52, 0},
+    {15, 52, 0},
+    {16, 52, 0},
+
+    // 图像倒数第13行（y=51）
+    {10, 51, 0},
+    {11, 51, 0},
+    {19, 51, 0},
+    {20, 51, 0},
+
+    // 图像倒数第14行（y=50）
+    {9, 50, 0},
+    {10, 50, 0},
+    {11, 50, 0},
+    {12, 50, 0},
+    {19, 50, 0},
+    {20, 50, 0},
+
+    // 图像倒数第15行（y=49）
+    {8, 49, 0},
+    {9, 49, 0},
+    {10, 49, 0},
+    {11, 49, 0},
+    {19, 49, 0},
+    {20, 49, 0},
+
+    // 图像最顶部行（y=48，在屏幕中y=63的上方15像素处）
+    {8, 48, 0},
+    {9, 48, 0},
+    {18, 48, 0}
+};
+
+void OledDisplay::drawGameMan() {
+    for (int i = 0; i < sizeof(gameManPoints) / sizeof(gameManPoints[0]); i++) {
+        u8g2.drawPixel(gameManPoints[i].x, gameManPoints[i].y);
+    }
+}
+
+void OledDisplay::displayGame() {
+    StateManager::updateGameManY();
+    Serial.printf("gameY = %d\n", StateManager::getGameManY());
+    u8g2.firstPage();
+    do {
+        u8g2.setFont(u8g2_font_wqy12_t_gb2312);
+        u8g2.drawFrame(0, 0, 96, 64);
+        u8g2.drawButtonUTF8(114, 12, U8G2_BTN_BW1 | U8G2_BTN_INV | U8G2_BTN_HCENTER, 0, 1, 2, "得分");
+        u8g2.drawStr(102, 32, "0");
+        u8g2.drawButtonUTF8(114, 48, U8G2_BTN_BW1 | U8G2_BTN_INV | U8G2_BTN_HCENTER, 0, 1, 2, "纪录");
+        u8g2.drawStr(102, 64, "9999");
+        u8g2.drawBitmap(5, StateManager::getGameManY(), 4, 32, IMAGE_BIG_MAN);
+    } while (u8g2.nextPage());
+    if (StateManager::getGameManY() == 0 && StateManager::getGameManDY() == -1) {
+        StateManager::updateGameManDY(1);
+    } else if (StateManager::getGameManY() == 31 && StateManager::getGameManDY() == 1) {
+        StateManager::updateGameManDY(0);
+    }
 }
 
 /**
