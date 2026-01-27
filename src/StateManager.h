@@ -85,7 +85,7 @@ public:
 
     static int getGameManDY();
 
-    static void updateGameManDY(uint8_t d);
+    static void updateGameManDY(int d);
 
 private:
     static int menuIndex;

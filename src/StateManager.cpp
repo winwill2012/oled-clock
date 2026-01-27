@@ -96,7 +96,7 @@ int StateManager::getGameManDY() {
     return gameManDY;
 }
 
-void StateManager::updateGameManDY(uint8_t d) {
+void StateManager::updateGameManDY(int d) {
     gameManDY = d;
 }
 
@@ -145,6 +145,7 @@ void StateManager::updateStateByMenuItemIndex() {
             state = DisplayStopWatch;
             break;
         default:
+            updateOledRefreshInterval(0);
             state = DisplayGame;
             break;
     }
