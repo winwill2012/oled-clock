@@ -10,7 +10,7 @@ int StateManager::gameManDY = 0;
 unsigned long StateManager::stopWatchStartMills = 0;
 unsigned long StateManager::frozenStopWatchMills = 0;
 int StateManager::oledRefreshInterval = 100;
-GlobalState StateManager::state = DisplayGame;
+GlobalState StateManager::state = DisplayClock;
 uint16_t StateManager::calendarYear;
 uint8_t StateManager::calendarMonth;
 const char *StateManager::weatherCityName = "昆明";

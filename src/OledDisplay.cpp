@@ -8,7 +8,7 @@
 
 String clockWeekDays[7] = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
 String calendarWeekDays[7] = {"日", "一", "二", "三", "四", "五", "六"};
-String menuItemNames[] = {"时钟", "日历", "天气", "计时", "秒表", "游戏"};
+String menuItemNames[] = {"时钟", "日历", "天气", "计时", "秒表"};
 uint8_t menuSize = sizeof(menuItemNames) / sizeof(menuItemNames[0]);
 extern NTPClient timeClient;
 extern tm timeInfo;
